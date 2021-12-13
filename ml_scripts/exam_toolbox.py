@@ -5,6 +5,7 @@ Author: Lukas Leindals / Hans Christian Lundberg
 """
 __version__ = "Revision: 2021-12-11"
 
+from scipy.spatial import distance
 import toolbox_extended as te  # pip install --ignore-installed ml02450
 import toolbox_02450 as tb
 import numpy as np
@@ -19,7 +20,9 @@ from sklearn.preprocessing import label_binarize
 from apyori import apriori
 from sklearn.cluster import KMeans
 import sklearn.metrics as metrics
+import itertools as IT
 import scipy.stats as st
+
 
 class prep_tools:
     def latex_to_df(self, x, cols, show=True, O_names=False, use_int=False):
@@ -405,6 +408,17 @@ class ensemble:
         plt.show()
 
         return roc_auc
+    def plot_roc_pred(self,truth,probabilities):
+        """Generates a ROC curve from true labels and predicted class probabilities
+
+        Args:
+            truth (list): List with true class labels
+            probabilities (list): List with predicted class probabilities
+        """
+        plt.figure(1)
+        tb.rocplot(probabilities, truth)
+
+        plt.show()  
 
 
 class supervised:
@@ -465,12 +479,82 @@ class supervised:
 
         return predictions
 
-    def knn_dist_pred(self, df, classes, K):
+    def knn_dist_pred_3d(self, df, class1, class2, class3, K, show=False):
         """
-        calculates predictions given a matrix with euclidean distances, can handle multiple classes
+        calculates predictions given a matrix with euclidean distances, can handle tree classes: red, black, blue
         -------------------------------------------------------
         class1 = list with numbers of observations in the red class (starts at 1)
         class2 = list with numbers of observations in the black class (starts at 1)
+        class3 = list with numbers of observations in the blue class (starts at 1)
+        """
+        classes = {"red": class1, "black": class2,"blue": class3}
+
+        # Get indexes of of red/black observations
+        red_ind = [i - 1 for i in classes["red"]]
+        black_ind = [i - 1 for i in classes["black"]]
+        blue_ind = [i - 1 for i in classes["blue"]]
+
+        pred_label = []
+        O = [i for i in range(1, df.shape[1] + 1)]
+
+        for row in range(df.shape[0]):
+            dist = df.loc[row, :].values
+            # sort
+            dist_sort = np.argsort(dist)
+            k_nearest_ind = dist_sort[1 : K + 1]
+
+            pred_red = 0
+            pred_black = 0
+            pred_blue = 0
+
+            for i in range(K):
+                if k_nearest_ind[i] in red_ind:
+                    pred_red += 1
+                elif k_nearest_ind[i] in black_ind:
+                    pred_black += 1
+                elif k_nearest_ind[i] in blue_ind:
+                    pred_blue += 1
+            if pred_red > pred_black and pred_red > pred_blue:
+                pred_label.append("red")
+            elif pred_black > pred_red and pred_black > pred_blue:
+                pred_label.append("black")
+            elif pred_blue > pred_red and pred_blue > pred_black:
+                pred_label.append("blue")
+            elif pred_black == pred_red == pred_blue:
+                if k_nearest_ind[0] in red_ind:
+                    pred_label.append("red")
+                elif k_nearest_ind[0] in black_ind:
+                    pred_label.append("black")
+                else:
+                    pred_label.append("blue")
+        true_label = []
+        for obs in O:
+            if obs - 1 in red_ind:
+                true_label.append("red")
+            elif obs - 1 in black_ind:
+                true_label.append("black")
+            elif obs - 1 in blue_ind:
+                true_label.append("blue")
+
+        predictions = pd.DataFrame(
+            {"Obs": O, "True_label": true_label, "Predicted_label": pred_label}
+        )
+
+        if show:
+            print("-" * 100)
+            print("The predictions when using the {} nearest neighbors are: ".format(K))
+            print(predictions)
+
+        return predictions
+    
+    def knn_dist_pred(self, df, classes, K):
+        """
+        !!!!!!!doesnt really work !!!!!!!! ?!?
+        calculates predictions given a matrix with euclidean distances, can handle multiple classes
+        -------------------------------------------------------
+        class1 = list with coloumn numbers of observations in the red class (starts at 1)
+        class2 = list with coloumn numbers of observations in the black class (starts at 1)
+        class3 = list with coloumn numbers of observations in the blue class (starts at 1)
         """
 
         classes = np.array(classes)
@@ -591,7 +675,7 @@ class supervised:
         df = data frame with binary data
         cols = columns to condition the probability on (starts at 0)
         col_vals = the values the columns are condtioned on
-        pred_class = the class you would like to predict the probability of (starts at 0)
+        pred_class = the class you would like to predict the probability of (starts at 0) <- remember this if y starts on 1
         """
         y = np.array(y)
 
@@ -660,7 +744,7 @@ class cluster:
         dist_df = symmetrical matrix/dataframe containing distances
         Method = linkage method:
             "single"
-            "complete"
+            "complete" aka Maximum
             "average"
         orientation = orientation of plot:
             "top"
@@ -710,15 +794,17 @@ class cluster:
         """
         Parameters
         ----------
-        x : Cluster A (labels)
+        x : Cluster A (labels) = The truth: Example: [1,2,1,1,1,2,2,2,2,1]
 
-        y : Cluster B
-
-        Returns: Similarity Index - Rand og Jaccard
-        eller den returnere ikke noget, den printer bare
-        -------
-        Copyright Peter Pik,
-        Danmarks Tekniske Universitet
+        y : Cluster B eg. [1,2,1,1,1,3,1,1,1,1]
+        Example from:
+        Cutoff at the level of 3 clusters = 3 vertical lines
+        Here we see O2 has been seperated, and O6 as well. 
+        Since O2 was seperated in the first cluster, we give it 2
+        And O6 we give 3
+        The rest have not been seperated yet, but majority black so we give it 1
+        
+        Printer similarity Index - Rand og Jaccard
         """
         x = np.array(x)
         np.array(y)
@@ -786,7 +872,24 @@ class cluster:
             )
         )
         return None
+    def distance_between_clusters(self,dist_matrix,cluster1,cluster2):
+        """Returns distance between clusters (avg linkage function)
 
+        Args:
+            dist_matrix (matrix): Distance matrix between observations
+            cluster1: Indexes of cluster 1 observations
+            cluster2: Indexes of cluster 2 observations
+        """
+        distances = []
+        for i in cluster1:
+            for j in cluster2:
+                distances.append(dist_matrix[i][j])
+        distances = np.array(distances)
+        sum = np.sum(distances)
+        elements = len(cluster1) * len(cluster2) 
+        print (sum/elements)
+        
+        
 
 class similarity:
     def measures(self, x, y):
@@ -1011,6 +1114,7 @@ class adaboost:
         er = np.dot(M[:, M.shape[1] - 1], last_wrong)
         alpha.append(1 / 2 * np.log((1 - er) / er))
         print(alpha)
+        
         return alpha
 class ann:
     
@@ -1028,11 +1132,23 @@ class ann:
 
     def get_ann(self,w02, weights, matrices, activation='logistic'):
         """
-
+        w02 : the w02 given in the xercise
+        weights : list of the weights which have superscript (2)
+        matrices : the matrices, usually w_n^(1)
         ann = get_ann(2.84, [3.25, 3.46], [[21.78, -1.65, 0, -13.26, -8.46], [-9.6, -0.44, 0.01, 14.54, 9.5]], "rect")
         y = ann([1, 6.8, 225, 0.44, 0.68])
-
+        
+        Example in Spring 2018, Exercise 8:
+        an_model = ann_obj.get_ann(0.3799E-6, [-0.3440E-6, 0.0429E-6], [[0.0189, 0.9159, -0.4256], [3.7336, -0.8003, 5.0741]], "logistic")
+        
+        #  !! Always put "1" as first for some reason !!
+        y_1 = an_model([1,0, 3])
+        y_2 = an_model([1,24, 0])
         REMEMBER TO PUT "1" AT THE START OF ann([..])
+        
+        activation: Sigmoid = Logistic Activation
+                    Tanh = hyperbolic tangent
+                    Rect = Linear activation
         """
         matrices = np.array([np.matrix(m).T for m in matrices])
         weights = np.array(weights)
@@ -1052,6 +1168,7 @@ class ann:
             return w02 + ann_sum
 
         return predict_y
+    
 class gmm:
     def plot_gmm(self,m,cov):
         """Function for plotting GMM contours
@@ -1082,7 +1199,15 @@ class gmm:
             means: a list of means of the normal distribution for all classes
             standard_dev: a list of standard deviaitons (sigma) (NOT VARIANCES) for all classes
             target_class: desired class to calc the prob for. ZERO INDEX (y=0, or 1, 2 etc)
-                          By default, keyword "all" calculates for every class (recommended)
+                        By default, keyword "all" calculates for every class (recommended)
+        Example:
+        x = 3.19
+        weights = [0.19, 0.34, 0.48]
+        means = [3.177, 3.181, 3.184]
+        standard_dev = [0.0062, 0.0076, 0.0075]
+        gm = gmm()
+        gm.prob_gmm(x,weights,means,standard_dev,"all") #zero index for target class, we want 2 so y=1
+
         """
         
         #Error checking for bad user input:
@@ -1102,13 +1227,84 @@ class gmm:
         else:
             print(f"The prob that x={x} belongs to class {y} is {res[y]/sum(res)}")
             
+class itemset:
+    def itemsets(self,df, support_min):
+        """
+        df: dataframe with each row being a basket, and each column being an item
+        support_min: minimum support level
+        Remember that the printed itemsets start from 0!
+        """
+        itemsets = []
+        n = len(df)
+        for itsetSize in np.arange(1, len(df.columns) + 1): # Start with 1-itemsets, keep going till n_attributes-itemsets
+            for combination in IT.combinations(df.columns, itsetSize):
+                sup = itemset.support(self,df[list(combination)])
+                if sup > support_min:
+                    itemsets.append(set(combination))
+        print(itemsets)
+        return itemsets
+    
+    def support(self,itemset):
+        """
+        Returns the support value for the given itemset
+        itemset is a pandas dataframe with one row per basket, and one column per item
+        """
 
+        # Get the count of baskets where all the items are 1
+        baskets = itemset.iloc[:,0].copy()
+        for col in itemset.columns[1:]:
+            baskets = baskets & itemset[col]
 
-#Exam Question prob_gmm
-x = 3.19
-weights = [0.19, 0.34, 0.48]
-means = [3.177, 3.181, 3.184]
-standard_dev = [0.0062, 0.0076, 0.0075]
-gm = gmm()
-gm.prob_gmm(x,weights,means,standard_dev,"all") #zero index for target class, we want 2 so y=1
-# tests
+        return baskets.sum() / float(len(baskets))
+    
+    def confidence(self,df, antecedentCols, consequentCols):
+        """
+        df is a pandas dataframe
+        antecedentCols are the labels for the columns/items that make up the antecedent in the association rule
+        For both: Remember index starts at 0!
+        consequentCols are the labels for the columns/items that make up the consequent in the association rule
+        """
+        top = itemset.support(self,df[antecedentCols + consequentCols])
+        bottom = itemset.support(self,df[antecedentCols])
+        conf = top/bottom
+        print ("The confidence is: ", conf)
+        return conf
+class model_test:
+    def jeffery_interval(self,obs,corr_obs):
+        """
+        Prints the jeffery interval for a model. 
+        obs : observations
+        corr_obs : correctly classified observations
+        """
+        n = obs #observations
+        m = corr_obs #correct classified
+        alpha = 0.05 #always = 0.05
+
+        a = m + 0.5
+        b = n-m + 0.5
+
+        #Confidence Intervals
+        CI_L = st.beta.ppf(alpha/2,a,b)
+        CI_H = st.beta.ppf(1-alpha/2,a,b)
+        theta = a/(a+b)
+
+        #Jeffery Intervals Results
+        print(f"a={a}")
+        print(f"b={b}")
+        print(f"CI_L={CI_L}")
+        print(f"CI_H={CI_H}")
+        print(f"Theta={theta}")
+
+    def mcnemar_test(self,n1,n2):
+        """
+        Prints the p value from the McNemar test between 2 classification models 
+        n1 : the total number of times that Model 1 is correct and Model 2 is incorrect. Remember to sum, if multiple folds
+        n2 : the total number of times that Model 1 is incorrect and Model 2 is correct. Remember to sum, if multiple folds
+        """
+        N = n1+n2
+        m = min(n1,n2)
+        theta = 1/2 #always
+        
+        p_val = 2*st.binom.cdf(m,N,theta)
+        
+        print(f"p-val={p_val:.5f}")
