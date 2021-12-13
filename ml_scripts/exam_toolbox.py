@@ -24,6 +24,7 @@ import itertools as IT
 import scipy.stats as st
 
 
+
 class prep_tools:
     def latex_to_df(self, x, cols, show=True, O_names=False, use_int=False):
         """
@@ -300,6 +301,7 @@ class ensemble:
                 true positive rate = "tpr"
                 false positive rate = "fpr"
                 show confususion matrix = "show"
+                F-measure = "f_meas"
                 Receiver operating characteristic plot (TPR~FPR plot) = "roc"
                 show table with all values (list not necessary)= "all"
         """
@@ -313,6 +315,7 @@ class ensemble:
         err = (FN + FP) / N
         TPR = TP / (TP + FN)
         FPR = FP / (TN + FP)
+        F = (2*p*r)/(p+r)
 
         if "p" in stats:
             print("The precision is {}".format(p))
@@ -341,12 +344,13 @@ class ensemble:
             plt.ylabel("TPR")
             plt.xlabel("FPR")
             plt.show()
-
+        if "f_meas" in stats:
+            print ("The F measure is {}".format(F))
         if "all" in stats:
             all = pd.DataFrame(
                 {
-                    "Stat": ["Precision", "Recall", "Accuracy", "Error", "TPR", "FPR"],
-                    "Value": [p, r, acc, err, TPR, FPR],
+                    "Stat": ["Precision", "Recall", "Accuracy", "Error", "TPR", "FPR","F-measure"],
+                    "Value": [p, r, acc, err, TPR, FPR,F],
                 }
             )
             print(all)
@@ -412,7 +416,7 @@ class ensemble:
         """Generates a ROC curve from true labels and predicted class probabilities
 
         Args:
-            truth (list): List with true class labels
+            truth (list): List with true class labels (can also be a prediction from a model)
             probabilities (list): List with predicted class probabilities
         """
         plt.figure(1)
@@ -426,8 +430,8 @@ class supervised:
         """
         calculates predictions given a matrix with euclidean distances, can only handle two classes: red and black
         -------------------------------------------------------
-        class1 = list with numbers of observations in the red class (starts at 1)
-        class2 = list with numbers of observations in the black class (starts at 1)
+        class1 = list with coloumn numbers of observations in the red class (starts at 1)
+        class2 = list with coloumn numbers of observations in the black class (starts at 1)
         """
         classes = {"red": class1, "black": class2}
 
@@ -483,9 +487,9 @@ class supervised:
         """
         calculates predictions given a matrix with euclidean distances, can handle tree classes: red, black, blue
         -------------------------------------------------------
-        class1 = list with numbers of observations in the red class (starts at 1)
-        class2 = list with numbers of observations in the black class (starts at 1)
-        class3 = list with numbers of observations in the blue class (starts at 1)
+        class1 = list with coloumn numbers of observations in the red class (starts at 1)
+        class2 = list with coloumn numbers of observations in the black class (starts at 1)
+        class3 = list with coloumn numbers of observations in the blue class (starts at 1)
         """
         classes = {"red": class1, "black": class2,"blue": class3}
 
@@ -598,6 +602,12 @@ class supervised:
         -----------
         true_labels = list of true labels
         pred_labels = list of predicted labels
+        
+        If using predictions from knn function, you can call it the following way:
+        red_classes = [1,2,3,4,5,6,7,8]
+        black_classes = [9,10,11]
+        pred = sup.knn_dist_pred_2d(df,red_classes,black_classes,1)
+        sup.pred_stats(pred["True_label"],pred["Predicted_label"],show=True)
         """
         true_labels = np.array(true_labels)
         pred_labels = np.array(pred_labels)
@@ -937,6 +947,67 @@ class similarity:
         result = pd.DataFrame({"Measure": names, "Value": similarities})
         print(result)
         return result
+    
+    def correlation_from_covariance(self,cov_matrix):
+        """
+        cov_matrix : 2d array of covariance matrix, eg: [[0.2639, 0.0803], [0.0803, 0.0615]]
+        Calculates the correlation between the two x's in the covariance matrix
+        The correlation coefficient is defined as: p=cov(x,y)/(sigma_x*sigma_y)
+        """
+        cov = np.array(cov_matrix)
+        p = cov[1][0]/(cov[0][0]*cov[1][1])
+        print (p)
+        return p
+        
+        
+    def similarity(self, X, Y, method):
+        '''
+        Does it really work ??
+        SIMILARITY Computes similarity matrices
+
+        Usage:
+            sim = similarity(X, Y, method)
+
+        Input:
+        X   N1 x M matrix
+        Y   N2 x M matrix 
+        method   string defining one of the following similarity measure
+            'SMC', 'smc'             : Simple Matching Coefficient
+            'Jaccard', 'jac'         : Jaccard coefficient 
+            'ExtendedJaccard', 'ext' : The Extended Jaccard coefficient
+            'Cosine', 'cos'          : Cosine Similarity
+            'Correlation', 'cor'     : Correlation coefficient
+
+        Output:
+        sim Estimated similarity matrix between X and Y
+            If input is not binary, SMC and Jaccard will make each
+            attribute binary according to x>median(x)
+
+        Copyright, Morten Morup and Mikkel N. Schmidt
+        Technical University of Denmark '''
+
+        X = np.mat(X)
+        Y = np.mat(Y)
+        N1, M = np.shape(X)
+        N2, M = np.shape(Y)
+        
+        method = method[:3].lower()
+        if method=='smc': # SMC
+            #X,Y = binarize(X,Y);
+            sim = ((X*Y.T)+((1-X)*(1-Y).T))/M
+        elif method=='jac': # Jaccard
+            #X,Y = binarize(X,Y);
+            sim = (X*Y.T)/(M-(1-X)*(1-Y).T)        
+        elif method=='ext': # Extended Jaccard
+            XYt = X*Y.T
+            sim = XYt / (np.log( np.exp(sum(np.power(X.T,2))).T * np.exp(sum(np.power(Y.T,2))) ) - XYt)
+        elif method=='cos': # Cosine
+            sim = (X*Y.T)/(np.sqrt(sum(np.power(X.T,2))).T * np.sqrt(sum(np.power(Y.T,2))))
+        elif method=='cor': # Correlation
+            X_ = st.zscore(X,axis=1,ddof=1)
+            Y_ = st.zscore(Y,axis=1,ddof=1)
+            sim = (X_*Y_.T)/(M-1)
+        return sim
 
 
 class anomaly:
@@ -1074,11 +1145,17 @@ class adaboost:
     
     def adaboost(self, delta, rounds):
         """
+        delta : list of misclassified observations, 
+        0 = correctly classified, 1 = misclassified
+
+        rounds [int] : how many rounds to run
+        
+        Example: 
         Given a classification problem with 25 observations in total, 
         with 5 of them being misclassified in round 1, the weights can be calculated as:
         miss = np.zeros(25) 
         miss[:5] = 1 
-        te.adaboost(miss, rounds=1)
+        te.adaboost(miss, 1)
 
         The weights are printed 
         """
@@ -1174,20 +1251,23 @@ class gmm:
         """Function for plotting GMM contours
         Changing the coordinate system size is done inside the function!!
         Args:
-            m ([np.array]): Mu/mean/center. Example: np.array([[1.84],[2.43]])
-            cov ([np.array]): Covariance matrix. Example: np.array([[0.2639, 0.0803], [0.0803, 0.0615]])
+            m ([2d array]): Mu/mean/center. Example: [[1.84],[2.43]]
+            cov ([2d array]): Covariance matrix. Example: [[0.2639, 0.0803], [0.0803, 0.0615]]
         """
+        m = np.array(m)
+        cov = np.array(cov)
         N = 1000
 
         cov_inv = np.linalg.inv(cov)  # inverse of covariance matrix
         cov_det = np.linalg.det(cov)  # determinant of covariance matrix
         # Plotting
-        x = np.linspace(-2, 6, N) # Size of coordinate system
-        y = np.linspace(-2, 4, N)
+        x = np.linspace(-3, 5, N) # Size of coordinate system
+        y = np.linspace(-1.1, 2, N)
         X,Y = np.meshgrid(x,y)
         coe = 1.0 / ((2 * np.pi)**2 * cov_det)**0.5
         Z = coe * np.e ** (-0.5 * (cov_inv[0,0]*(X-m[0])**2 + (cov_inv[0,1] + cov_inv[1,0])*(X-m[0])*(Y-m[1]) + cov_inv[1,1]*(Y-m[1])**2))
         plt.contour(X,Y,Z)
+        plt.grid()
         plt.show()
         
     def prob_gmm(self, x, weights, means, standard_dev, target_class="all"):
@@ -1223,9 +1303,9 @@ class gmm:
             res.append(p_i)
         if y == "all":
             for i in range(len(res)):
-                print(f"The prob that x={x} belongs to class {i} is {res[i]/sum(res)}")
+                print(f"The prob that x={x} belongs to class {i} (0 index) is {res[i]/sum(res)}")
         else:
-            print(f"The prob that x={x} belongs to class {y} is {res[y]/sum(res)}")
+            print(f"The prob that x={x} belongs to class {y} (0 index) is {res[y]/sum(res)}")
             
 class itemset:
     def itemsets(self,df, support_min):
