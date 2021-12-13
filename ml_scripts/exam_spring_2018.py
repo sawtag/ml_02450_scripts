@@ -5,11 +5,7 @@ import pandas as pd
 from exam_toolbox import *
 import re
 import os
-#from Scripts import *
-#from Mine_Scripts import GMM_Plot
-#from Scripts import ann
 
-prep = prep_tools()
 pca = pca_calc()
 class exam:
 
@@ -20,6 +16,7 @@ class exam:
         return "C"
 
     # ----------------------------------------------- OPG 2-----------------------------------------------
+    
     def opg2():
         # We insert the the diagonal numbers from the S matrix
         diag_values = [13.5,7.6,6.5,5.8,3.5,2.0]
@@ -46,23 +43,23 @@ class exam:
     def opg5():
         GMM_Plot = gmm()
         # We plot different options for first cluster:
-        mu = np.array([[1.84],[2.43]])  # defining the mean/center of the Gaussian (mX, mY)
-        cov = np.array([[0.2639, 0.0803], [0.0803, 0.0615]])   # defining the covariance matrix left-right, row by row
+        mu = [[1.84],[2.43]] # defining the mean/center of the Gaussian (mX, mY)
+        cov = [[0.2639, 0.0803], [0.0803, 0.0615]]   # defining the covariance matrix left-right, row by row
         GMM_Plot.plot_gmm(mu,cov)
                 
-        mu = np.array([[1.84],[2.43]])  # defining the mean/center of the Gaussian (mX, mY)
-        cov = np.array([[3.82, 1.71], [1.71, 0.7672]])   # defining the covariance matrix
+        mu = [[1.84],[2.43]]  # defining the mean/center of the Gaussian (mX, mY)
+        cov = [[3.82, 1.71], [1.71, 0.7672]]  # defining the covariance matrix
         GMM_Plot.plot_gmm(mu,cov)
         
         #It's not A 
         
         # We plot different options for third cluster:
-        mu = np.array([[-0.6687],[-0.7343]])  # defining the mean/center of the Gaussian (mX, mY)
-        cov = np.array([[4.0475, -1.5818], [-1.5818, 1.1146]])   # defining the covariance matrix left-right, row by row
+        mu = [[-0.6687],[-0.7343]]  # defining the mean/center of the Gaussian (mX, mY)
+        cov = [[4.0475, -1.5818], [-1.5818, 1.1146]]   # defining the covariance matrix left-right, row by row
         GMM_Plot.plot_gmm(mu,cov)
                 
-        mu = np.array([[-0.6687],[-0.7343]])  # defining the mean/center of the Gaussian (mX, mY)
-        cov = np.array([[0.1166, -0.0771], [-0.0771, 0.1729]])   # defining the covariance matrix left-right, row by row
+        mu = [[-0.6687],[-0.7343]]  # defining the mean/center of the Gaussian (mX, mY)
+        cov = [[0.1166, -0.0771], [-0.0771, 0.1729]]   # defining the covariance matrix left-right, row by row
         GMM_Plot.plot_gmm(mu,cov)
         
         #It's not B
@@ -243,7 +240,7 @@ class exam:
         assc = association_mining()
         # We add the indexes of the assocation rule elements
         assc.rule_stats(df,[3,5,7,9],[11])
-        # Rule = 0.2
+        # Support = 0.2
         # Confidence = 0.666
         return "B"
 
@@ -349,7 +346,7 @@ class exam:
 #        ans.loc[2] = "Q02: {}".format(exam.opg2())
 #        ans.loc[3] = "Q03: {}".format(exam.opg3())
 #        ans.loc[4] = "Q04: {}".format(exam.opg4())
-#        ans.loc[5] = "Q05: {}".format(exam.opg5())
+        ans.loc[5] = "Q05: {}".format(exam.opg5())
 #        ans.loc[6] = "Q06: {}".format(exam.opg6())
 #        ans.loc[7] = "Q07: {}".format(exam.opg7())
 #        ans.loc[8] = "Q08: {}".format(exam.opg8())
@@ -362,7 +359,7 @@ class exam:
 #        ans.loc[14] = "Q13: {}".format(exam.opg13())
 #        ans.loc[15] = "Q14: {}".format(exam.opg14())
 #        ans.loc[16] = "Q15: {}".format(exam.opg15())
-#        ans.loc[17] = "Q16: {}".format(exam.opg16())
+        # ans.loc[17] = "Q16: {}".format(exam.opg16())
 #        ans.loc[18] = "Q17: {}".format(exam.opg17())
 #        ans.loc[19] = "Q18: {}".format(exam.opg18())
 #        ans.loc[20] = "Q19: {}".format(exam.opg19())
