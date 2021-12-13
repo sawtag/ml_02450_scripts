@@ -19,7 +19,7 @@ from sklearn.preprocessing import label_binarize
 from apyori import apriori
 from sklearn.cluster import KMeans
 import sklearn.metrics as metrics
-
+import scipy.stats as st
 
 class prep_tools:
     def latex_to_df(self, x, cols, show=True, O_names=False, use_int=False):
@@ -1072,4 +1072,43 @@ class gmm:
         Z = coe * np.e ** (-0.5 * (cov_inv[0,0]*(X-m[0])**2 + (cov_inv[0,1] + cov_inv[1,0])*(X-m[0])*(Y-m[1]) + cov_inv[1,1]*(Y-m[1])**2))
         plt.contour(X,Y,Z)
         plt.show()
+        
+    def prob_gmm(self, x, weights, means, standard_dev, target_class="all"):
+        """Return the mixture prob that x belongs to a class
+        A normal distribution is assumed
+        Input:
+            x: the variable of interest in prob calculations
+            weights: a list of weights for all classes
+            means: a list of means of the normal distribution for all classes
+            standard_dev: a list of standard deviaitons (sigma) (NOT VARIANCES) for all classes
+            target_class: desired class to calc the prob for. ZERO INDEX (y=0, or 1, 2 etc)
+                          By default, keyword "all" calculates for every class (recommended)
+        """
+        
+        #Error checking for bad user input:
+        assert len(weights)==len(means)==len(standard_dev),\
+        "The weights, means and std lists must have the same number of items. Check your lists."
+        if type(target_class) == int:
+            assert target_class < len(means), "Target Class is out of range. Make sure you are starting from 0"
+        
+        y = target_class
+        res = []
+        for (w,u,s) in zip(weights, means, standard_dev):
+            p_i = w*st.norm.pdf(x=x,loc=u,scale=s)
+            res.append(p_i)
+        if y == "all":
+            for i in range(len(res)):
+                print(f"The prob that x={x} belongs to class {i} is {res[i]/sum(res)}")
+        else:
+            print(f"The prob that x={x} belongs to class {y} is {res[y]/sum(res)}")
+            
+
+
+#Exam Question prob_gmm
+x = 3.19
+weights = [0.19, 0.34, 0.48]
+means = [3.177, 3.181, 3.184]
+standard_dev = [0.0062, 0.0076, 0.0075]
+gm = gmm()
+gm.prob_gmm(x,weights,means,standard_dev,"all") #zero index for target class, we want 2 so y=1
 # tests
